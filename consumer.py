@@ -28,19 +28,28 @@ BATCH_SIZE = 10          # 每次消费批量大小
 TARGET_NOTE_KEYWORD = os.getenv("TARGET_NOTE_KEYWORD", "游戏共创") 
 
 
-def handle_message(msg: dict):
+# reply.sh 脚本路径
+REPLY_SCRIPT = Path(__file__).parent / "doc" / "reply.sh"
+
+
+def handle_message(msg: dict) -> bool:
     """
-    处理单条消息的业务逻辑。
-    当前版本：日志输出。
-    后续可替换为 Gemini 生图 / 自动回复等。
+    处理单条消息的业务逻辑：
+    1. 调用 opencode agent 生成回复内容
+    2. 调用 reply.sh 将回复发送到小红书
 
     Args:
         msg: 消息字典，包含 comment_content, user_nickname, note_content 等字段
+
+    Returns:
+        True 表示处理并回复成功，False 表示失败
     """
     msg_type = msg.get("type", "")
     user = msg.get("user_nickname", "未知用户")
     comment = msg.get("comment_content", "")
     note = msg.get("note_content", "")
+    note_id = msg.get("note_id", "")
+    comment_id = msg.get("comment_id", "")
 
     if msg_type == "comment/comment":
         target = msg.get("target_comment_content", "")
@@ -52,27 +61,54 @@ def handle_message(msg: dict):
             f"💬 处理评论消息: {user} 在笔记 \"{note[:20]}...\" 评论: \"{comment}\""
         )
 
-    # 调用 opencode --agent gamemaker 将评论发送过去
+    # === 第一步：调用 opencode --agent gamemaker 生成回复 ===
     try:
         logger.info(f"🚀 正在发送消息给 gamemaker agent: '{comment}'")
-        # capture_output=True 获取标准输出和标准错误，text=True 表示以字符串形式返回
         result = subprocess.run(
-            ["opencode", "run","--agent", "gamemaker", comment],
+            ["opencode", "run", "--agent", "gamemaker", comment],
             capture_output=True,
             text=True,
-            check=False  # 设置为 False 防止非 0 退出码抛出异常退出消费循环
+            check=False
         )
-        
-        # 记录执行结果
-        if result.returncode == 0:
-            logger.info(f"✅ gamemaker 处理成功。返回结果:\n{result.stdout.strip()}")
-        else:
+
+        if result.returncode != 0:
             logger.error(f"❌ gamemaker 处理失败 (code {result.returncode})。\n错误信息:\n{result.stderr.strip()}")
-            
+            return False
+
+        reply_content = result.stdout.strip()
+        logger.info(f"✅ gamemaker 处理成功。返回结果:\n{reply_content}")
+
     except FileNotFoundError:
         logger.error("❌ 找不到 'opencode' 命令，请确保它已安装并在 PATH 中。")
+        return False
     except Exception as e:
         logger.error(f"❌ 调用 opencode 时发生未知错误: {e}")
+        return False
+
+    # === 第二步：调用 reply.sh 回复评论 ===
+    if not reply_content:
+        logger.warning("⚠️ gamemaker 返回内容为空，跳过回复")
+        return False
+
+    try:
+        logger.info(f"📤 正在回复评论: note_id={note_id}, comment_id={comment_id}, content='{reply_content[:50]}...'")
+        reply_result = subprocess.run(
+            ["bash", str(REPLY_SCRIPT), note_id, comment_id, reply_content],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if reply_result.returncode == 0:
+            logger.info(f"✅ 回复成功！响应:\n{reply_result.stdout.strip()}")
+            return True
+        else:
+            logger.error(f"❌ 回复失败 (code {reply_result.returncode})。\n错误信息:\n{reply_result.stderr.strip()}")
+            return False
+
+    except Exception as e:
+        logger.error(f"❌ 调用 reply.sh 时发生错误: {e}")
+        return False
 
 
 def consume_once():
@@ -100,8 +136,11 @@ def consume_once():
 
         try:
             update_status(msg_id, "processing")
-            handle_message(msg)
-            update_status(msg_id, "done")
+            success = handle_message(msg)
+            if success:
+                update_status(msg_id, "done")
+            else:
+                update_status(msg_id, "failed")
         except Exception as e:
             logger.error(f"❌ 处理消息 {msg_id} 失败: {e}")
             update_status(msg_id, "failed")

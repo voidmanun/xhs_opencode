@@ -1194,3 +1194,56 @@ sh fetchMentions.sh
     "code": 0
 }
 ```
+
+
+### 回复评论
+
+```
+sh reply.sh note_id target_comment_id content
+```
+
+#### 参数参考
+
+```
+{"note_id":"697dcbb9000000002102abfd","target_comment_id":"69a3cb010000000004000580","content":"嘿嘿，是吧","at_users":[]}
+```
+
+#### 返回值参考
+```
+{
+    "success": true,
+    "msg": "成功",
+    "data": {
+        "time": 1772342049838,
+        "toast": "你的回复已发布",
+        "comment": {
+            "note_id": "697dcbb9000000002102abfd",
+            "status": 2,
+            "at_users": [],
+            "liked": false,
+            "user_info": {
+                "nickname": "低配玩家小马",
+                "image": "https://sns-avatar-qc.xhscdn.com/avatar/1040g2jo316r0inu2k40g4a5rrihke633g210pbo?imageView2/2/w/120/format/jpg",
+                "user_id": "5b11e34711be10479b461863"
+            },
+            "create_time": 1772342049794,
+            "target_comment": {
+                "id": "69a3cb010000000004000580",
+                "user_info": {
+                    "user_id": "62c68608000000000303e158",
+                    "nickname": "ThreeLadies 生活实录",
+                    "image": "https://sns-avatar-qc.xhscdn.com/avatar/1040g2jo31re5p8ut70005om6go40voao184kp68?imageView2/2/w/120/format/jpg"
+                }
+            },
+            "id": "69a3cb21000000003102e0e4",
+            "content": "嘿嘿，是吧",
+            "like_count": "0",
+            "show_tags": [
+                "is_author"
+            ],
+            "ip_location": "浙江"
+        }
+    },
+    "code": 0
+}
+```
