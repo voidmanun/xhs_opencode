@@ -103,9 +103,9 @@ def fetch_pending(limit: int = 10) -> list[dict]:
 
 
 def update_status(msg_id: str, status: str):
-    """更新消息状态：processing / done / failed"""
+    """更新消息状态：processing / done / failed / ignored"""
     conn = get_connection()
-    processed_at = datetime.now().isoformat() if status in ("done", "failed") else None
+    processed_at = datetime.now().isoformat() if status in ("done", "failed", "ignored") else None
     conn.execute("""
         UPDATE messages
         SET status = ?, processed_at = ?

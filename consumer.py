@@ -5,6 +5,7 @@ consumer.py - 消息消费者
 import time
 import logging
 import subprocess
+import os
 from pathlib import Path
 
 from message_store import init_db, fetch_pending, update_status, get_stats
@@ -22,6 +23,9 @@ logger = logging.getLogger(__name__)
 
 CONSUME_INTERVAL = 5    # 消费轮询间隔（秒）
 BATCH_SIZE = 10          # 每次消费批量大小
+
+# 配置特定笔记的关键词（如果笔记内容包含该关键词，则处理该笔记下的回复）
+TARGET_NOTE_KEYWORD = os.getenv("TARGET_NOTE_KEYWORD", "游戏共创") 
 
 
 def handle_message(msg: dict):
@@ -82,6 +86,18 @@ def consume_once():
 
     for msg in messages:
         msg_id = msg["id"]
+        note_id = msg.get("note_id", "")
+        note_content = msg.get("note_content", "")
+        
+        # 如果配置了特定的笔记关键词，且当前消息的笔记内容不包含该关键词，则直接置为 ignored
+        if TARGET_NOTE_KEYWORD and TARGET_NOTE_KEYWORD not in note_content:
+            logger.info(f"⏭️ 忽略非目标笔记的消息: {msg_id} (note_id: {note_id}, 未包含关键词 '{TARGET_NOTE_KEYWORD}')")
+            try:
+                update_status(msg_id, "ignored")
+            except Exception as e:
+                logger.error(f"❌ 忽略消息 {msg_id} 失败: {e}")
+            continue
+
         try:
             update_status(msg_id, "processing")
             handle_message(msg)
