@@ -100,13 +100,25 @@ def run_reply(note_id: str, target_comment_id: str, content: str, xsec_token: st
             comment_element = page.locator(comment_selector).first
             
             # 循环滚动直到找到对应评论
-            max_scroll_attempts = 20
+            max_scroll_attempts = 40
             found = False
             for attempt in range(max_scroll_attempts):
                 if comment_element.is_visible():
                     found = True
                     logger.info(f"✅ 成功找到评论块: {target_comment_id}")
                     break
+                
+                # 尝试展开所有被折叠的子评论，防止目标评论被隐藏
+                try:
+                    for btn in page.locator(".show-more").all():
+                        if btn.is_visible():
+                            try:
+                                btn.click(timeout=1000)
+                                page.wait_for_timeout(300)
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
                 
                 # 执行智能滚动
                 page.evaluate(smart_scroll_js, 500)

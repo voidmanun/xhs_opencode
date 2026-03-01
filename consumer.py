@@ -95,15 +95,19 @@ def handle_message(msg: dict) -> bool:
     # === 第一步：调用 opencode --agent gamemaker 生成回复 ===
     try:
         logger.info(f"🚀 正在发送消息给 gamemaker agent: '{comment}'")
-        # 由于 opencode 可能是通过 zsh alias 或特殊的 PATH 提供，尝试以 shell=True 执行
-        cmd_str = f"opencode run --agent gamemaker '{comment}'"
+        # 修改为使用 opencode 的绝对路径，并移除对 /bin/zsh 的硬依赖
+        opencode_path = "/root/.opencode/bin/opencode"
+        if not os.path.exists(opencode_path):
+            opencode_path = "opencode"  # fallback
+            
+        cmd_str = f"{opencode_path} run --agent gamemaker '{comment}'"
         result = subprocess.run(
             cmd_str,
             shell=True,
             capture_output=True,
             text=True,
             check=False,
-            executable='/bin/zsh'
+            cwd="/root/workspace/share_game"
         )
 
         if result.returncode != 0:
