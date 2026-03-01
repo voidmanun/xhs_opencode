@@ -3,6 +3,7 @@ consumer.py - 消息消费者
 每 5 秒扫描 SQLite 中 pending 状态的消息，执行处理逻辑
 """
 import time
+import json
 import logging
 import subprocess
 import os
@@ -50,9 +51,20 @@ def handle_message(msg: dict) -> bool:
     note = msg.get("note_content", "")
     note_id = msg.get("note_id", "")
     comment_id = msg.get("comment_id", "")
+    xsec_token = msg.get("xsec_token", "")  # Add xsec_token
 
+    # 对于回复类型的消息，需要把回复挂到被回复的那条评论下而不是新评论上
     if msg_type == "comment/comment":
         target = msg.get("target_comment_content", "")
+        # 从 raw_json 中提取真正的 target_comment.id
+        try:
+            raw_msg = json.loads(msg.get("raw_json", "{}"))
+            target_comment_id = raw_msg.get("comment_info", {}).get("target_comment", {}).get("id", comment_id)
+            if target_comment_id:
+                comment_id = target_comment_id
+        except:
+            pass
+            
         logger.info(
             f"💬 处理回复消息: {user} 回复了 \"{target[:30]}...\" → \"{comment}\""
         )
@@ -65,27 +77,33 @@ def handle_message(msg: dict) -> bool:
     try:
         ack_msg = "收到，马上为您安排。"
         logger.info(f"📤 正在发送初始确认回复: content='{ack_msg}'")
+        # 修改为调用 doc/reply.py
+        reply_script_py = str(Path(__file__).parent / "doc" / "reply.py")
         ack_result = subprocess.run(
-            ["bash", str(REPLY_SCRIPT), note_id, comment_id, ack_msg],
+            ["python3", reply_script_py, note_id, comment_id, ack_msg, xsec_token],
             capture_output=True,
             text=True,
             check=False
         )
         if ack_result.returncode == 0:
-            logger.info("✅ 初始确认回复发送成功！")
+            logger.info(f"✅ 初始确认回复发出，响应返回码 0。输出内容:\n{ack_result.stdout.strip()}\n{ack_result.stderr.strip()}")
         else:
             logger.warning(f"⚠️ 初始确认回复失败 (code {ack_result.returncode})，将继续执行 agent 发送。\n错误信息:\n{ack_result.stderr.strip()}")
     except Exception as e:
-        logger.warning(f"⚠️ 调用初始 reply.sh 时发生错误: {e}")
+        logger.warning(f"⚠️ 调用初始 reply.py 时发生错误: {e}")
 
     # === 第一步：调用 opencode --agent gamemaker 生成回复 ===
     try:
         logger.info(f"🚀 正在发送消息给 gamemaker agent: '{comment}'")
+        # 由于 opencode 可能是通过 zsh alias 或特殊的 PATH 提供，尝试以 shell=True 执行
+        cmd_str = f"opencode run --agent gamemaker '{comment}'"
         result = subprocess.run(
-            ["opencode", "run", "--agent", "gamemaker", comment],
+            cmd_str,
+            shell=True,
             capture_output=True,
             text=True,
-            check=False
+            check=False,
+            executable='/bin/zsh'
         )
 
         if result.returncode != 0:
@@ -109,8 +127,9 @@ def handle_message(msg: dict) -> bool:
 
     try:
         logger.info(f"📤 正在回复评论: note_id={note_id}, comment_id={comment_id}, content='{reply_content[:50]}...'")
+        reply_script_py = str(Path(__file__).parent / "doc" / "reply.py")
         reply_result = subprocess.run(
-            ["bash", str(REPLY_SCRIPT), note_id, comment_id, reply_content],
+            ["python3", reply_script_py, note_id, comment_id, reply_content, xsec_token],
             capture_output=True,
             text=True,
             check=False
@@ -141,6 +160,20 @@ def consume_once():
         msg_id = msg["id"]
         note_id = msg.get("note_id", "")
         note_content = msg.get("note_content", "")
+        
+        # 提取 xsec_token (针对 comment/comment 等情况)
+        try:
+            raw_msg = json.loads(msg["raw_json"])
+            # 先尝试从顶层取，对于 note_info 可能在顶层
+            token = raw_msg.get("item_info", {}).get("xsec_token", "")
+            if not token:
+                # 尝试从 comment_info 的外层或自身附带信息取
+                token = raw_msg.get("user_info", {}).get("xsec_token", "")
+            msg["xsec_token"] = token
+            logger.info(f"🔑 提取到 xsec_token: '{token}' (msg_id: {msg_id})")
+        except Exception as e:
+            logger.error(f"❌ 提取 xsec_token 失败 (msg_id: {msg_id}): {e}")
+            msg["xsec_token"] = ""
         
         # 如果配置了特定的笔记关键词，且当前消息的笔记内容不包含该关键词，则直接置为 ignored
         if TARGET_NOTE_KEYWORD and TARGET_NOTE_KEYWORD not in note_content:

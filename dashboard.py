@@ -32,21 +32,26 @@ def parse_curl_to_auth(curl_text: str) -> dict:
     return auth
 
 
-def update_auth(curl_text: str):
+def update_auth(curl_text: str, creator_curl_text: str = ""):
     try:
         if AUTH_FILE.exists():
             with open(AUTH_FILE, "r", encoding="utf-8") as f:
                 current_data = json.load(f)
         else:
-            current_data = {"fetch": {}, "reply": {}}
+            current_data = {"fetch": {}, "reply": {}, "creator": {}}
     except Exception:
-        current_data = {"fetch": {}, "reply": {}}
+        current_data = {"fetch": {}, "reply": {}, "creator": {}}
             
     if curl_text.strip():
         auth_data = parse_curl_to_auth(curl_text)
         if auth_data:
              current_data["fetch"] = auth_data
              current_data["reply"] = auth_data
+             
+    if creator_curl_text.strip():
+        creator_data = parse_curl_to_auth(creator_curl_text)
+        if creator_data:
+             current_data["creator"] = creator_data
              
     current_data["updated_at"] = datetime.now().isoformat()
     
@@ -275,6 +280,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 <script>
                     function submitAuth() {{
                         const curlText = document.getElementById('curl-text').value;
+                        const creatorCurlText = document.getElementById('creator-curl-text').value;
                         
                         document.getElementById('submit-btn').disabled = true;
                         document.getElementById('submit-btn').innerText = '保存中...';
@@ -284,7 +290,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                             headers: {{
                                 'Content-Type': 'application/json',
                             }},
-                            body: JSON.stringify({{ curl: curlText }}),
+                            body: JSON.stringify({{ curl: curlText, creator_curl: creatorCurlText }}),
                         }})
                         .then(response => response.json())
                         .then(data => {{
@@ -321,9 +327,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     </p>
                     
                     <div style="margin-top: 20px;">
-                        <h3>统一 cURL 认证配置</h3>
+                        <h3>1. 普通小红书 API 认证 (拉取消息)</h3>
                         <p style="font-size: 12px; color: #888; margin-top:-10px;">粘贴任意一个小红书 API 的 cURL（推荐使用 <code>/you/mentions</code> 或 <code>/comment/post</code>）</p>
                         <textarea id="curl-text" placeholder="粘贴完整的 cURL 命令 (curl 'https://edith.xiaohongshu.com/api/...')..."></textarea>
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <h3>2. 创作者中心 API 认证 (自动回复)</h3>
+                        <p style="font-size: 12px; color: #888; margin-top:-10px;">请前往 <code>creator.xiaohongshu.com</code> 后台，抓取任意一个请求并 Copy as cURL</p>
+                        <textarea id="creator-curl-text" placeholder="粘贴创作者中心的 cURL 命令 (curl 'https://creator.xiaohongshu.com/api/...')..."></textarea>
                     </div>
                     
                     <div style="margin-top: 20px;">
@@ -347,8 +359,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             try:
                 data = json.loads(post_data)
                 curl_text = data.get("curl", "")
+                creator_curl_text = data.get("creator_curl", "")
                 
-                updated_data = update_auth(curl_text)
+                updated_data = update_auth(curl_text, creator_curl_text)
                 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json; charset=utf-8')
