@@ -32,25 +32,21 @@ def parse_curl_to_auth(curl_text: str) -> dict:
     return auth
 
 
-def update_auth(fetch_curl: str, reply_curl: str):
-    if not AUTH_FILE.exists():
-        current_data = {"fetch": {}, "reply": {}}
-    else:
-        try:
+def update_auth(curl_text: str):
+    try:
+        if AUTH_FILE.exists():
             with open(AUTH_FILE, "r", encoding="utf-8") as f:
                 current_data = json.load(f)
-        except Exception:
+        else:
             current_data = {"fetch": {}, "reply": {}}
+    except Exception:
+        current_data = {"fetch": {}, "reply": {}}
             
-    if fetch_curl.strip():
-        fetch_auth = parse_curl_to_auth(fetch_curl)
-        if fetch_auth:
-             current_data["fetch"].update(fetch_auth)
-             
-    if reply_curl.strip():
-        reply_auth = parse_curl_to_auth(reply_curl)
-        if reply_auth:
-             current_data["reply"].update(reply_auth)
+    if curl_text.strip():
+        auth_data = parse_curl_to_auth(curl_text)
+        if auth_data:
+             current_data["fetch"] = auth_data
+             current_data["reply"] = auth_data
              
     current_data["updated_at"] = datetime.now().isoformat()
     
@@ -278,8 +274,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 </style>
                 <script>
                     function submitAuth() {{
-                        const fetchCurl = document.getElementById('fetch-curl').value;
-                        const replyCurl = document.getElementById('reply-curl').value;
+                        const curlText = document.getElementById('curl-text').value;
                         
                         document.getElementById('submit-btn').disabled = true;
                         document.getElementById('submit-btn').innerText = '保存中...';
@@ -289,7 +284,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                             headers: {{
                                 'Content-Type': 'application/json',
                             }},
-                            body: JSON.stringify({{ fetch_curl: fetchCurl, reply_curl: replyCurl }}),
+                            body: JSON.stringify({{ curl: curlText }}),
                         }})
                         .then(response => response.json())
                         .then(data => {{
@@ -303,8 +298,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                             }}
                             
                             // 清空输入框
-                            document.getElementById('fetch-curl').value = '';
-                            document.getElementById('reply-curl').value = '';
+                            document.getElementById('curl-text').value = '';
                             
                             setTimeout(() => {{ msg.style.display = 'none'; }}, 3000);
                         }})
@@ -323,24 +317,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     <h2>🔑 认证信息管理</h2>
                     <p style="color: #666;">上次更新时间：<span id="updated-time" style="font-weight: bold;">{updated_at}</span></p>
                     <p style="font-size: 14px; background: #fff8f0; padding: 10px; border-left: 4px solid #ff9800;">
-                        使用说明：请在浏览器开发者工具 (Network) 中，找到请求，右键 -> <b>Copy as cURL</b>，然后将整个 cURL 命令粘贴到下方对应的文本框中。系统会自动解析 Cookie 和 Header 签名参数。
+                        使用说明：请在浏览器开发者工具 (Network) 中，找到请求，右键 -> <b>Copy as cURL</b>，然后将整个 cURL 命令粘贴到下方。拉取和回复将共享这一份认证配置。
                     </p>
                     
                     <div style="margin-top: 20px;">
-                        <h3>1. 拉取评论消息 (Fetch Mentions)</h3>
-                        <p style="font-size: 12px; color: #888; margin-top:-10px;">对应请求: <code>/api/sns/web/v1/you/mentions</code></p>
-                        <textarea id="fetch-curl" placeholder="粘贴完整的 cURL 命令 (curl 'https://edith.xiaohongshu.com/api/sns/web/v1/you/mentions...')..."></textarea>
-                    </div>
-                    
-                    <div style="margin-top: 15px;">
-                        <h3>2. 回复评论 (Reply Comment)</h3>
-                        <p style="font-size: 12px; color: #888; margin-top:-10px;">对应请求: <code>/api/sns/web/v1/comment/post</code></p>
-                        <textarea id="reply-curl" placeholder="粘贴完整的 cURL 命令 (curl 'https://edith.xiaohongshu.com/api/sns/web/v1/comment/post...')..."></textarea>
+                        <h3>统一 cURL 认证配置</h3>
+                        <p style="font-size: 12px; color: #888; margin-top:-10px;">粘贴任意一个小红书 API 的 cURL（推荐使用 <code>/you/mentions</code> 或 <code>/comment/post</code>）</p>
+                        <textarea id="curl-text" placeholder="粘贴完整的 cURL 命令 (curl 'https://edith.xiaohongshu.com/api/...')..."></textarea>
                     </div>
                     
                     <div style="margin-top: 20px;">
                         <button id="submit-btn" onclick="submitAuth()">保存并更新</button>
-                        <div id="success-msg" class="success-msg">✅ 认证信息已成功解析并保存生效！</div>
+                        <div id="success-msg" class="success-msg">✅ 认证信息已成功解析并保存生效！统一应用到拉取与回复。</div>
                     </div>
                 </div>
             </body>
@@ -358,10 +346,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             
             try:
                 data = json.loads(post_data)
-                fetch_curl = data.get("fetch_curl", "")
-                reply_curl = data.get("reply_curl", "")
+                curl_text = data.get("curl", "")
                 
-                updated_data = update_auth(fetch_curl, reply_curl)
+                updated_data = update_auth(curl_text)
                 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json; charset=utf-8')
