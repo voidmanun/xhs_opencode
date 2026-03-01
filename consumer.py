@@ -61,6 +61,23 @@ def handle_message(msg: dict) -> bool:
             f"💬 处理评论消息: {user} 在笔记 \"{note[:20]}...\" 评论: \"{comment}\""
         )
 
+    # === 第零步：发送初始确认回复 ===
+    try:
+        ack_msg = "收到，马上为您安排。"
+        logger.info(f"📤 正在发送初始确认回复: content='{ack_msg}'")
+        ack_result = subprocess.run(
+            ["bash", str(REPLY_SCRIPT), note_id, comment_id, ack_msg],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if ack_result.returncode == 0:
+            logger.info("✅ 初始确认回复发送成功！")
+        else:
+            logger.warning(f"⚠️ 初始确认回复失败 (code {ack_result.returncode})，将继续执行 agent 发送。\n错误信息:\n{ack_result.stderr.strip()}")
+    except Exception as e:
+        logger.warning(f"⚠️ 调用初始 reply.sh 时发生错误: {e}")
+
     # === 第一步：调用 opencode --agent gamemaker 生成回复 ===
     try:
         logger.info(f"🚀 正在发送消息给 gamemaker agent: '{comment}'")
