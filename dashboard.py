@@ -4,11 +4,61 @@ dashboard.py - 简单的 HTTP 服务，用于查看 SQLite 数据库中消息的
 """
 import json
 import sqlite3
+import re
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from message_store import get_connection, get_stats
 
 DB_PATH = Path(__file__).parent / "messages.db"
+AUTH_FILE = Path(__file__).parent / "doc" / "auth.json"
+
+
+def parse_curl_to_auth(curl_text: str) -> dict:
+    auth = {}
+    cookie_match = re.search(r"-b\s+'([^']+)'", curl_text) or re.search(r'-b\s+"([^"]+)"', curl_text)
+    if cookie_match:
+        auth["cookie"] = cookie_match.group(1)
+        
+    headers_to_extract = ["x-s", "x-s-common", "x-t", "x-b3-traceid", "x-xray-traceid"]
+    for header in headers_to_extract:
+        pattern = rf"-H\s+'{header}:\s*([^']+)'"
+        match = re.search(pattern, curl_text, re.IGNORECASE)
+        if not match:
+             pattern = rf'-H\s+"{header}:\s*([^"]+)"'
+             match = re.search(pattern, curl_text, re.IGNORECASE)
+        if match:
+             auth[header.replace("-", "_")] = match.group(1)
+    return auth
+
+
+def update_auth(fetch_curl: str, reply_curl: str):
+    if not AUTH_FILE.exists():
+        current_data = {"fetch": {}, "reply": {}}
+    else:
+        try:
+            with open(AUTH_FILE, "r", encoding="utf-8") as f:
+                current_data = json.load(f)
+        except Exception:
+            current_data = {"fetch": {}, "reply": {}}
+            
+    if fetch_curl.strip():
+        fetch_auth = parse_curl_to_auth(fetch_curl)
+        if fetch_auth:
+             current_data["fetch"].update(fetch_auth)
+             
+    if reply_curl.strip():
+        reply_auth = parse_curl_to_auth(reply_curl)
+        if reply_auth:
+             current_data["reply"].update(reply_auth)
+             
+    current_data["updated_at"] = datetime.now().isoformat()
+    
+    with open(AUTH_FILE, "w", encoding="utf-8") as f:
+        json.dump(current_data, f, indent=4)
+        
+    return current_data
+
 
 def get_recent_messages(limit=50):
     conn = get_connection()
@@ -110,7 +160,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 </script>
             </head>
             <body>
-                <h1>🍌 消息监控面板</h1>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h1>🍌 消息监控面板</h1>
+                    <a href="/auth" style="padding: 8px 16px; background: #ff2442; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">🔑 认证管理</a>
+                </div>
                 
                 <div class="card">
                     <h2>整体统计</h2>
@@ -194,6 +247,131 @@ class DashboardHandler(BaseHTTPRequestHandler):
             data = {"stats": stats, "messages": messages}
             
             self.wfile.write(json.dumps(data).encode('utf-8'))
+        elif self.path == '/auth':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html; charset=utf-8')
+            self.end_headers()
+            
+            try:
+                with open(AUTH_FILE, "r", encoding="utf-8") as f:
+                    auth_data = json.load(f)
+                updated_at = auth_data.get("updated_at", "未知")
+            except:
+                updated_at = "暂无"
+
+            html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>认证管理 - 小红书评论系统</title>
+                <meta charset="utf-8">
+                <style>
+                    body {{ font-family: 'PingFang SC', sans-serif; margin: 20px; background-color: #f5f5f5; color: #333; }}
+                    h1, h2 {{ color: #ff2442; }}
+                    .card {{ background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; max-width: 800px; margin: 0 auto; }}
+                    textarea {{ width: 100%; height: 150px; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 13px; resize: vertical; margin-bottom: 10px; }}
+                    button {{ background-color: #ff2442; color: white; border: none; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; border-radius: 4px; cursor: pointer; }}
+                    button:hover {{ background-color: #e61b36; }}
+                    .success-msg {{ color: #4caf50; font-weight: bold; display: none; margin-top: 10px; }}
+                    .nav-link {{ color: #666; text-decoration: none; margin-bottom: 20px; display: inline-block; }}
+                    .nav-link:hover {{ text-decoration: underline; }}
+                </style>
+                <script>
+                    function submitAuth() {{
+                        const fetchCurl = document.getElementById('fetch-curl').value;
+                        const replyCurl = document.getElementById('reply-curl').value;
+                        
+                        document.getElementById('submit-btn').disabled = true;
+                        document.getElementById('submit-btn').innerText = '保存中...';
+                        
+                        fetch('/api/auth', {{
+                            method: 'POST',
+                            headers: {{
+                                'Content-Type': 'application/json',
+                            }},
+                            body: JSON.stringify({{ fetch_curl: fetchCurl, reply_curl: replyCurl }}),
+                        }})
+                        .then(response => response.json())
+                        .then(data => {{
+                            document.getElementById('submit-btn').disabled = false;
+                            document.getElementById('submit-btn').innerText = '保存并更新';
+                            
+                            const msg = document.getElementById('success-msg');
+                            msg.style.display = 'block';
+                            if (data.updated_at) {{
+                                document.getElementById('updated-time').innerText = data.updated_at;
+                            }}
+                            
+                            // 清空输入框
+                            document.getElementById('fetch-curl').value = '';
+                            document.getElementById('reply-curl').value = '';
+                            
+                            setTimeout(() => {{ msg.style.display = 'none'; }}, 3000);
+                        }})
+                        .catch(error => {{
+                            console.error('Error:', error);
+                            alert('保存失败，请查看控制台');
+                            document.getElementById('submit-btn').disabled = false;
+                            document.getElementById('submit-btn').innerText = '保存并更新';
+                        }});
+                    }}
+                </script>
+            </head>
+            <body>
+                <div class="card">
+                    <a href="/" class="nav-link">← 返回监控面板</a>
+                    <h2>🔑 认证信息管理</h2>
+                    <p style="color: #666;">上次更新时间：<span id="updated-time" style="font-weight: bold;">{updated_at}</span></p>
+                    <p style="font-size: 14px; background: #fff8f0; padding: 10px; border-left: 4px solid #ff9800;">
+                        使用说明：请在浏览器开发者工具 (Network) 中，找到请求，右键 -> <b>Copy as cURL</b>，然后将整个 cURL 命令粘贴到下方对应的文本框中。系统会自动解析 Cookie 和 Header 签名参数。
+                    </p>
+                    
+                    <div style="margin-top: 20px;">
+                        <h3>1. 拉取评论消息 (Fetch Mentions)</h3>
+                        <p style="font-size: 12px; color: #888; margin-top:-10px;">对应请求: <code>/api/sns/web/v1/you/mentions</code></p>
+                        <textarea id="fetch-curl" placeholder="粘贴完整的 cURL 命令 (curl 'https://edith.xiaohongshu.com/api/sns/web/v1/you/mentions...')..."></textarea>
+                    </div>
+                    
+                    <div style="margin-top: 15px;">
+                        <h3>2. 回复评论 (Reply Comment)</h3>
+                        <p style="font-size: 12px; color: #888; margin-top:-10px;">对应请求: <code>/api/sns/web/v1/comment/post</code></p>
+                        <textarea id="reply-curl" placeholder="粘贴完整的 cURL 命令 (curl 'https://edith.xiaohongshu.com/api/sns/web/v1/comment/post...')..."></textarea>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <button id="submit-btn" onclick="submitAuth()">保存并更新</button>
+                        <div id="success-msg" class="success-msg">✅ 认证信息已成功解析并保存生效！</div>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+            self.wfile.write(html.encode('utf-8'))
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_POST(self):
+        if self.path == '/api/auth':
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            
+            try:
+                data = json.loads(post_data)
+                fetch_curl = data.get("fetch_curl", "")
+                reply_curl = data.get("reply_curl", "")
+                
+                updated_data = update_auth(fetch_curl, reply_curl)
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, "updated_at": updated_data.get("updated_at")}).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
         else:
             self.send_response(404)
             self.end_headers()
