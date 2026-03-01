@@ -1,0 +1,19 @@
+curl 'https://edith.xiaohongshu.com/api/sns/web/v1/you/mentions?num=20&cursor=' \
+  -H 'accept: application/json, text/plain, */*' \
+  -H 'accept-language: zh-CN,zh;q=0.9' \
+  -b 'abRequestId=c82008a1-1d6b-5d53-8133-b054ce35e50a; xsecappid=xhs-pc-web; a1=19c9ed88a52aw639z86vixcm16cqo9uo2xtk7twsg30000172510; webId=99fc22e462615269bacd9b479b4ed072; gid=yjSjdfYjSSJyyjSjdfYY0C9E2J0EKqjuYKh39MkCS6yKSTq8Alj7lW888yWJ2y88WdYSfS2S; web_session=04006979cf9feb154835c3ed943b4bafdeac88; id_token=VjEAADXMBHjchkQx05IR7LUsnTYjJS0Z54/2l8JboLoPvwzNKao3QqoB9DavUHcuVB01u/XVgNSXAxT4uwka3GSKmpoHJze0Nio97nPeMD+yUwZqT+edYZb9Q4OA0rb/0BjfYOyV; webBuild=5.13.0; acw_tc=0a4a9dd317723309032382497ebcb73b32b8386fd80b8d83da06ec288a827f; websectiga=cf46039d1971c7b9a650d87269f31ac8fe3bf71d61ebf9d9a0a87efb414b816c; sec_poison_id=441733a4-514b-4d2f-8f25-d7ee7afe3403; loadts=1772330914196' \
+  -H 'origin: https://www.xiaohongshu.com' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://www.xiaohongshu.com/' \
+  -H 'sec-ch-ua: "Not:A-Brand";v="99", "Google Chrome";v="145", "Chromium";v="145"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-site' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36' \
+  -H 'x-b3-traceid: e1d10010874b2834' \
+  -H 'x-s: XYS_2UQhPsHCH0c1PUhlHjIj2erjwjQhyoPTqBPT49pjHjIj2eHjwjQ+GnPW/MPjNsQhPUHCHfM1qAZAPebK8MQYa7bjweQ6L/Y+pfG3pFLAPBSD4d4hqfpQGSHh+p8Ta9khnnSPa/QxJjV7a/zDnDEe+rTsqbZlpbYz2gZF/b+MJ9bepDMCPem1wok3/Spn4e8sJ7WlyoGUwLT7pBM+49Sia/DhppYs8A8U/Bql8aV78MLIaDYNnb+tnDlo+0LlprMeJdmALdkaaSmpGpcAJrQUaM+18b8yJB+kz/mtLDS3PrRH/SQaprMA+LTELDcAqpkhpAb089EgnDbyynI3HjIj2ecjwjHjKc==' \
+  -H 'x-s-common: 2UQAPsHCPUIjqArjwjHjNsQhPsHCH0rjNsQhPaHCH0c1PUhlHjIj2eHjwjQ+GnPW/MPjNsQhPUHCHdYiqUMIGUM78nHjNsQh+sHCH0L1P/P1PsHVHdWMH0ijP/S0wnpDweYY+/QY4AGAwgih+d8k2B+TP/80qnuE4nuU2oz3+7z7q9qAPeZIPer7P0LlPsHVHdW9H0ijHjIj2eqjwjHjNsQhwsHCHDDAwoQH8B4AyfRI8FS98g+Dpd4daLP3JFSb/BMsn0pSPM87nrldzSzQ2bPAGdb7zgQB8nph8emSy9E0cgk+zSS1qgzianYt8p+1/LzN4gzaa/+NqMS6qS4HLozoqfQnPbZEp98QyaRSp9P98pSl4oSzcgmca/P78nTTL08z/sVManD9q9z18np/8db8aob7JeQl4epsPrzsagW3tF4ryaRApdz3agYDq7YM47HFqgzkanYMGLSbP9LA/bGIa/+nprSe+9LI4gzVPDbrJg+P4fprLFTALMm7+LSb4d+kpdzt/7b7wrQM498cqBzSpr8g/FSh+bzQygL9nSm7qSmM4epQ4flY/BQdqA+l4oYQ2BpAPp87arS34nMQyFSE8nkdqMD6pMzd8/4SL7bF8aRr+7+rG7mkqBpD8pSUzozQcA8Szb87PDSb/d+/qgzVJfl/4LExpdzQ4fRSy7bFP9+y+7+nJAzdaLp/2LSiz/zzwgbMagYiJdbCwB4QyFSfJ7b7yFSenS4o+A+A8BlO8p8c4A+Q4DbSPB8d8nzfJrkQy/pAPFMUJeQM4rbQyLTAynz98nTy/fpLLocFJDbO8p4c4FpQ4SSYG9LA8nzM4MpIcfpA8Sm7cDDA+oQQ2rLM/op749bl4UTU8nTinDbw8/b+/fLILoqEaL+wqM8PJ9p/GDSBanT6qM+U+7+nJD8kanTdqM8n4rMQygpDqgb7t7zl4b4QPAmSPMm7aLSiJ9LA4gclanSOq9kM4e+74gz1qMm7nrSeG9lQPFSUP04VyAQQ+nLl4gzeaLp/NFSbadPILoz1qbSQcLuIafp88DclaLpULrRc4rT6qgqAa/+O8gYl4b4z/epSyn+mqA+Iyo4QyBRAPASOqA+M4o+0Lo4YaL+tqM4c4ApQyn4Sy9pl/rSea9px8sRA8SmF+LSh+7+h4g4r+BMrJDSkG0zQ2rESPUuIqMzY4d+DanpSyMm7cDSiL7YQcFGMNMm7cFSkzsRQPURSPrb3J0W7J9pDpd4UanSc/7kn4FSTnfpS8rM98p4l4FQdLocUanS+wLSiybbIqgqU2gp7aDSk/fpDJrEAygpF+bkM4URQy/cU8p8FLrS3zMzSJLzoanDAqAb//dPlJf4SPp878npM4oQQPFYCa/P7qA8c4bpQcA4S8rz3prSeGfSsJb+daLPhzDSbPBpgpd4G+bmFwBMc4BMQcMbkag8tqAbf4fLAqgqI87mo+LS94LGhLoz1JpmF/FDAnflQ2rM0anT/qDSiP9LAzrkApfQVLdzM4URQ4fPMGgp7z7Qn4FbQ4DESyn8yyFSkzFbd8d8S8S8FPrEc4bG3cpk3arly2LDAyF4oqg49a/P9qFcIp94QyMiRHjIj2eDjwjFl+/qAw/D7weHhNsQhP/Zjw0ZVHdWlPaHCHfE6qfMYJsHVHdWlPjHCH0r7+AHAPAZEP/c9+ecvP/q7P0rhP/Ghw/DAPUQR' \
+  -H 'x-t: 1772330942260' \
+  -H 'x-xray-traceid: ce5393ff8a0a7caa3bbb0673e1058f9e'
