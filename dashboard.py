@@ -149,6 +149,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                         <td>${{contentHtml}}</td>
                                         <td>${{noteTitleHtml}}</td>
                                         <td><div class="timestamp">${{msg.created_at || ''}}</div><div class="timestamp" style="color:#aaa;">${{msg.processed_at || ''}}</div></td>
+                                        <td><button onclick="skipMessage('${{msg.id}}')" style="padding: 4px 8px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">跳过</button></td>
                                     `;
                                     tbody.appendChild(tr);
                                 }});
@@ -157,13 +158,35 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     }}
                     
                     // 每 5 秒刷新一次
+                    function skipMessage(id) {{
+                        if (confirm("确定要跳过这条消息吗？")) {{
+                            fetch("/api/skip", {{
+                                method: "POST",
+                                headers: {{ "Content-Type": "application/json" }},
+                                body: JSON.stringify({{ id: id }})
+                            }})
+                            .then(response => response.json())
+                            .then(data => {{
+                                if (data.success) {{
+                                    fetchData();
+                                }} else {{
+                                    alert("跳过失败: " + data.error);
+                                }}
+                            }})
+                            .catch(error => console.error("Error:", error));
+                        }}
+                    }}
+
                     setInterval(fetchData, 5000);
                 </script>
             </head>
             <body>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h1>🍌 消息监控面板</h1>
+                    <div>
+                        <a href="/manual" style="padding: 8px 16px; background: #2196F3; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; margin-right: 10px;">🤖 手动测试 Agent</a>
                     <a href="/auth" style="padding: 8px 16px; background: #ff2442; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">🔑 认证管理</a>
+                    </div>
                 </div>
                 
                 <div class="card">
@@ -202,6 +225,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                 <th style="width: 35%;">评论内容</th>
                                 <th style="width: 25%;">对应笔记</th>
                                 <th style="width: 160px;">时间(创建/处理)</th>
+                                <th style="width: 80px;">操作</th>
                             </tr>
                         </thead>
                         <tbody id="messages-body">
@@ -226,6 +250,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                 <td>{content_html}</td>
                                 <td>{note_html}</td>
                                 <td><div class="timestamp">{msg.get('created_at', '')}</div><div class="timestamp" style="color:#aaa;">{msg.get('processed_at', '') or ''}</div></td>
+                                <td><button onclick="skipMessage('{msg['id']}')" style="padding: 4px 8px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">跳过</button></td>
                             </tr>
                 """
             html += """
@@ -347,6 +372,112 @@ class DashboardHandler(BaseHTTPRequestHandler):
             </html>
             """
             self.wfile.write(html.encode('utf-8'))
+        elif self.path == '/manual':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html; charset=utf-8')
+            self.end_headers()
+            
+            html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>手动测试 Agent - 小红书评论系统</title>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: 'PingFang SC', sans-serif; margin: 20px; background-color: #f5f5f5; color: #333; }
+                    h1, h2 { color: #2196F3; }
+                    .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; max-width: 800px; margin: 0 auto; }
+                    textarea { width: 100%; height: 100px; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-family: sans-serif; font-size: 14px; resize: vertical; margin-bottom: 10px; }
+                    button { background-color: #2196F3; color: white; border: none; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; border-radius: 4px; cursor: pointer; }
+                    button:hover { background-color: #1976D2; }
+                    button:disabled { background-color: #ccc; cursor: not-allowed; }
+                    .nav-link { color: #666; text-decoration: none; margin-bottom: 20px; display: inline-block; }
+                    .nav-link:hover { text-decoration: underline; }
+                    #result-box { margin-top: 20px; padding: 15px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap; display: none; font-family: monospace; font-size: 14px; }
+                    .loading { color: #666; font-style: italic; }
+                </style>
+                <script>
+                    function sendManualTest() {
+                        const message = document.getElementById('message-text').value;
+                        if (!message.trim()) return;
+                        
+                        const btn = document.getElementById('submit-btn');
+                        const resultBox = document.getElementById('result-box');
+                        
+                        btn.disabled = true;
+                        btn.innerText = '正在思考，请稍候...';
+                        resultBox.style.display = 'block';
+                        resultBox.innerHTML = '<span class="loading">🚀 正在发送消息给 gamemaker agent...</span>';
+                        
+                        fetch('/api/manual', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ message: message }),
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            btn.disabled = false;
+                            btn.innerText = '发送测试';
+                            
+                            if (data.success) {
+                                resultBox.innerHTML = '<b>✅ gamemaker 处理成功：</b><br><br>' + data.reply;
+                            } else {
+                                resultBox.innerHTML = '<b style="color:red;">❌ 处理失败：</b><br><br>' + data.error;
+                            }
+                        })
+                        .catch(error => {
+                            btn.disabled = false;
+                            btn.innerText = '发送测试';
+                            resultBox.innerHTML = '<b style="color:red;">❌ 请求异常：</b><br><br>' + error;
+                        });
+                    }
+                </script>
+            </head>
+            <body>
+                <div class="card">
+                    <a href="/" class="nav-link">← 返回监控面板</a>
+                    <h2>🤖 手动测试 Agent</h2>
+                    <p style="font-size: 14px; background: #e3f2fd; padding: 10px; border-left: 4px solid #2196F3;">
+                        在这里输入测试消息并调用 opencode agent。调用逻辑同系统收到真实评论一致，仅返回结果，不发送到小红书。
+                    </p>
+                    
+                    <div style="margin-top: 20px;">
+                        <textarea id="message-text" placeholder="输入你想测试的消息内容..."></textarea>
+                    </div>
+                    
+                    <div style="margin-top: 10px;">
+                        <button id="submit-btn" onclick="sendManualTest()">发送测试</button>
+                    </div>
+                    
+                    <div id="result-box"></div>
+                </div>
+            </body>
+            </html>
+            """
+            self.wfile.write(html.encode('utf-8'))
+
+        elif self.path == "/api/skip":
+            content_length = int(self.headers.get("Content-Length", 0))
+            post_data = self.rfile.read(content_length).decode("utf-8")
+            try:
+                data = json.loads(post_data)
+                msg_id = data.get("id")
+                if not msg_id:
+                    raise ValueError("消息 ID 不能为空")
+                from message_store import update_status
+                update_status(msg_id, "ignored")
+                self.send_response(200)
+                self.send_header("Content-type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+
         else:
             self.send_response(404)
             self.end_headers()
@@ -372,6 +503,68 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.send_header('Content-type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
+        elif self.path == '/api/manual':
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            
+            try:
+                data = json.loads(post_data)
+                comment = data.get("message", "")
+                
+                if not comment:
+                    raise ValueError("消息不能为空")
+                    
+                opencode_path = "/root/.opencode/bin/opencode"
+                import os, subprocess
+                if not os.path.exists(opencode_path):
+                    opencode_path = "opencode"
+                    
+                cmd_str = f"{opencode_path} run --agent gamemaker '{comment}'"
+                
+                result = subprocess.run(
+                    cmd_str,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    cwd="/root/workspace/share_game"
+                )
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json; charset=utf-8')
+                self.end_headers()
+                
+                if result.returncode != 0:
+                    self.wfile.write(json.dumps({"success": False, "error": result.stderr.strip()}).encode('utf-8'))
+                else:
+                    self.wfile.write(json.dumps({"success": True, "reply": result.stdout.strip()}).encode('utf-8'))
+                    
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
+
+        elif self.path == "/api/skip":
+            content_length = int(self.headers.get("Content-Length", 0))
+            post_data = self.rfile.read(content_length).decode("utf-8")
+            try:
+                data = json.loads(post_data)
+                msg_id = data.get("id")
+                if not msg_id:
+                    raise ValueError("消息 ID 不能为空")
+                from message_store import update_status
+                update_status(msg_id, "ignored")
+                self.send_response(200)
+                self.send_header("Content-type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+
         else:
             self.send_response(404)
             self.end_headers()
