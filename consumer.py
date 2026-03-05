@@ -25,10 +25,6 @@ logger = logging.getLogger(__name__)
 CONSUME_INTERVAL = 5    # 消费轮询间隔（秒）
 BATCH_SIZE = 10          # 每次消费批量大小
 
-# 配置特定笔记的关键词（如果笔记内容包含该关键词，则处理该笔记下的回复）
-TARGET_NOTE_KEYWORD = os.getenv("TARGET_NOTE_KEYWORD", "游戏共创") 
-
-
 # reply.sh 脚本路径
 REPLY_SCRIPT = Path(__file__).parent / "doc" / "reply.sh"
 
@@ -163,7 +159,7 @@ def consume_once():
     for msg in messages:
         msg_id = msg["id"]
         note_id = msg.get("note_id", "")
-        note_content = msg.get("note_content", "")
+        comment_content = msg.get("comment_content", "")
         
         # 提取 xsec_token (针对 comment/comment 等情况)
         try:
@@ -179,9 +175,9 @@ def consume_once():
             logger.error(f"❌ 提取 xsec_token 失败 (msg_id: {msg_id}): {e}")
             msg["xsec_token"] = ""
         
-        # 如果配置了特定的笔记关键词，且当前消息的笔记内容不包含该关键词，则直接置为 ignored
-        if TARGET_NOTE_KEYWORD and TARGET_NOTE_KEYWORD not in note_content:
-            logger.info(f"⏭️ 忽略非目标笔记的消息: {msg_id} (note_id: {note_id}, 未包含关键词 '{TARGET_NOTE_KEYWORD}')")
+        # 只处理以"听我说"开头的评论，其他评论直接忽略
+        if not comment_content.startswith("听我说"):
+            logger.info(f"⏭️ 忽略非目标评论: {msg_id} (评论内容不以'听我说'开头: '{comment_content[:30]}...')")
             try:
                 update_status(msg_id, "ignored")
             except Exception as e:
