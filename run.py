@@ -76,4 +76,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "manual":
+        # 如果带有 manual 参数，启动手动测试入口
+        import manual
+        manual.main()
+    else:
+        main()
